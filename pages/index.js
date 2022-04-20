@@ -4,7 +4,7 @@ import Link from 'next/link'
 import styles from '../styles/Home.module.css'
 import { create, urlSource } from 'ipfs-http-client'
 import {
-  Input, FormControl, Select, Image, FormLabel, Heading, Text, Box, Stack, HStack, VStack, Container, Button, flattenTokens
+  Input, FormControl, Select, Spinner, Image, FormLabel, Heading, Text, Box, Stack, HStack, VStack, Container, Button, flattenTokens, Grid
 } from '@chakra-ui/react'
 
 const FormInput = ({ label, htmlFor, ...rest }) => (
@@ -14,9 +14,20 @@ const FormInput = ({ label, htmlFor, ...rest }) => (
   </FormControl>
 )
 
+const ItemCard = ({ image, name, price, currency }) => (
+  <Box bgColor="gray.50">
+    <Image h="auto" w="full" src={`https://cloudflare-ipfs.com/ipfs/${image}`} />
+    <Stack>
+      <Heading size="md">{name}</Heading>
+      <Heading size="xs">{price} {currency}</Heading>
+    </Stack>
+  </Box>
+)
+
 export default function Home() {
+  const [loading, isLoading] = useState(false)
   const [item, setItem] = useState({})
-  const [data, setData] = useState({})
+  const [data, setData] = useState([])
   const [path, setPath] = useState("")
   const [cid, setCid] = useState("")
   const [imageUrl, setImageUrl] = useState(``)
@@ -25,27 +36,29 @@ export default function Home() {
 
   useEffect(() => {
     fetchData()
-    setData({...data})
+    setData([...data])
   }, [cid])
 
   console.log(data)
 
   async function fetchData() {
-    const data = await fetch(path)
-    const file = await data.json()
-    setData(file)
+    const item = await fetch(path)
+    const file = await item.json()
+    setData([...data, file])
   }
 
   function onChange({ target: { name, value } }) {
-    setItem({ ...item, [name]: value, "image": imageUrl })
+    setItem({ ...item, [name]: value, "image": imageUrl, path: cid })
     console.log(item)
   }
 
   async function createItem() {
+    isLoading(true)
     const file = JSON.stringify(item)
     try {
       const added = await client.add(file)
       const url = `https://cloudflare-ipfs.com/ipfs/${added.path}`
+      isLoading(false)
       setPath(url)
       setCid(added.path)
       console.log(url)
@@ -58,8 +71,7 @@ export default function Home() {
     const file = e.target.files[0]
     try {
       const added = await client.add(file)
-      const url = `https://cloudflare-ipfs.com/ipfs/${added.path}`
-      setImageUrl(url)
+      setImageUrl(added.path)
       console.log(url)
     } catch (error) {
       console.log('Error uploading file: ', error)
@@ -74,18 +86,30 @@ export default function Home() {
         <link rel="icon" href="/favicon.ico" />
       </Head>
 
-      <FormInput onChange={onChange} name="name" label="Item name" />
-      <FormInput onChange={onChange} name="description" label="Description" />
-      <FormInput type="number" onChange={onChange} name="price" label="Price" />
-      <FormInput type="file" onChange={uploadImage} name="image" label="Upload Image" />
-      <Select onChange={onChange} name="currency" placeholder='Select Currency'>
-        <option value='bnb'>BNB</option>
-        <option value='eth'>ETH</option>
-        <option value='cake'>CAKE</option>
-      </Select>
-      <Button onClick={createItem}>Create</Button>
-      <Text>{data.name}</Text>
-      <Image boxSize={200} src={data.image} />
+      <Stack>
+        <FormInput onChange={onChange} name="name" label="Item name" />
+        <FormInput onChange={onChange} name="description" label="Description" />
+        <FormInput type="number" onChange={onChange} name="price" label="Price" />
+        <FormInput type="file" onChange={uploadImage} name="image" label="Upload Image" />
+        <Select onChange={onChange} name="currency" placeholder='Select Currency'>
+          <option value='bnb'>BNB</option>
+          <option value='eth'>ETH</option>
+          <option value='cake'>CAKE</option>
+        </Select>
+        <Button onClick={createItem}>Create</Button>
+        {
+          loading ?
+            <Spinner />
+            :
+            <Grid templateColumns="repeat(4, 1fr)" gap={6}>
+              {
+                data.map((d, i) => (
+                  <ItemCard {...d} key={i} />
+                ))
+              }
+            </Grid>
+        }
+      </Stack>
     </Container>
   )
 }
